@@ -147,7 +147,7 @@
       </div>
       <div class="row" id="shopButtons"></div>
       <div class="hint">
-        Build walls create chokepoints (zombies can break them). Purple escape door exists in Endless mode. Chapters are free-roam maps (objectives come next).
+        Build walls create chokepoints (zombies can break them). Purple escape door exists in Endless mode. Chapters are free-roam maps (objectives can be added later).
         Hold right-click to look around, scroll wheel zoom.
       </div>
     </div>
@@ -155,7 +155,7 @@
     <div id="adminPanel" class="panel">
       <div class="row">
         <span class="badge">Admin Console</span>
-        <span class="hint">Type a command and press <b>Enter</b>.</span>
+        <span class="hint">Type a command and press <b>Enter</b>. (Typing won’t move you.)</span>
       </div>
       <textarea id="adminLog" readonly></textarea>
       <div class="row">
@@ -164,7 +164,9 @@
         <button id="btnClearLog">Clear</button>
       </div>
       <div class="hint">
-        Try: <code>help</code>, <code>endless</code>, <code>chapter 1</code>, <code>chapter 2</code>, <code>chapter 3</code>, <code>unlockchapters</code>, <code>difficulty easy/medium/hard</code>
+        Commands: <code>help</code>, <code>god on/off</code>, <code>money N</code>, <code>heal N</code>, <code>wave +1</code>, <code>spawn N</code>,
+        <code>give devblaster</code>, <code>clear</code>, <code>endless</code>, <code>chapter 1/2/3</code>, <code>difficulty easy/medium/hard</code>,
+        <code>clearzombies</code>, <code>freezezombies on/off</code>, <code>zoom N</code>, <code>door on/off</code>, <code>tool door</code>
       </div>
     </div>
   </div>
@@ -180,7 +182,7 @@
       <div class="menuGrid">
         <div class="modeCard">
           <h3>Endless Mode (Original) — Classic</h3>
-          <p>This is your original experience: infinite waves, escape door works, finish button works. Nothing changed.</p>
+          <p>Infinite waves + escape door works + finish button works. Classic survival.</p>
           <div class="row">
             <button id="btnPickEndless">Play Endless</button>
           </div>
@@ -188,7 +190,7 @@
 
         <div class="modeCard">
           <h3>Chapter 1: Quarantine Block — Easy</h3>
-          <p>Original-style map (improved layout). Free roam. Objectives system comes next.</p>
+          <p>Improved original-style map. Free roam. Endless waves still happen.</p>
           <div class="row">
             <button id="btnPickCh1">Play Chapter 1</button>
           </div>
@@ -196,7 +198,7 @@
 
         <div class="modeCard">
           <h3>Chapter 2: Forest Outskirts — Medium</h3>
-          <p>Bigger outdoor map with grass. Grass slightly slows zombies. Indoor + outdoor combat.</p>
+          <p>Bigger outdoor map with grass. Grass slightly slows zombies (and you a tiny bit).</p>
           <div class="row">
             <button id="btnPickCh2">Play Chapter 2</button>
           </div>
@@ -212,7 +214,7 @@
       </div>
 
       <div class="hint">
-        <b>Note:</b> Chapters are now about <i>roaming big maps</i>. Next upgrade after your review: keys + tools + objectives (Piggy-style).
+        <b>Tip:</b> Click once on the game after Start so keyboard feels instant.
       </div>
     </div>
   </div>
@@ -236,9 +238,7 @@
         <li><b>P</b> pause/resume</li>
         <li><b>Menu</b> returns to main menu</li>
       </ul>
-      <div class="hint">
-        <b>Tip:</b> Click once on the canvas after Start so keyboard input feels instant.
-      </div>
+      <div class="hint">Admin code: <b>Admin123</b> (infinite money, god mode, dev blaster, door tool).</div>
     </div>
   </div>
 
@@ -250,14 +250,13 @@
         <button id="btnCloseChangelog">Close</button>
       </div>
       <div class="hint" style="margin-top:8px;">
-        <b>v0.5 — Chapters + Maps</b>
+        <b>v0.6 — Final Merge (End of Day Build)</b>
         <ul>
-          <li>Added Main Menu + Chapter Select.</li>
-          <li>Endless Mode preserved (original gameplay unchanged).</li>
-          <li>Added Chapter 1/2/3 maps (bigger roamable spaces).</li>
-          <li>Chapter 2 includes outdoor grass that slightly slows zombies.</li>
-          <li>Admin commands expanded (chapter switching, difficulty presets, unlock chapters).</li>
-          <li>Next planned upgrade: Piggy-style objectives (keys/tools/doors).</li>
+          <li>Main Menu + Chapter Select (Endless + Chapters 1/2/3).</li>
+          <li>All core features preserved: guns, durability, walls, doors, waves, juggernauts, helper, XP.</li>
+          <li>Fixed input focus: typing never triggers movement/shooting.</li>
+          <li>Outdoor grass tile in Chapter 2 (slight slow effect).</li>
+          <li>Admin console expanded.</li>
         </ul>
       </div>
     </div>
@@ -331,7 +330,6 @@
   const MODE = { ENDLESS: "ENDLESS", CHAPTER: "CHAPTER" };
   let gameMode = MODE.ENDLESS;
   let currentChapter = 1;
-  let chaptersUnlocked = true; // all playable now; can lock later if you want
 
   function modeLabel(){
     if(gameMode === MODE.ENDLESS) return "Endless (Original)";
@@ -360,7 +358,7 @@
 
   // ===== World =====
   const TILE = 40;
-  const MAP_W = 50;              // bigger base map size
+  const MAP_W = 50;
   const MAP_H = 32;
   const WORLD_W = MAP_W * TILE;
   const WORLD_H = MAP_H * TILE;
@@ -447,90 +445,75 @@
       }
     }
   }
-
-  // ===== Chapter Maps =====
   function buildOuterWalls(){
     for(let x=0;x<MAP_W;x++){ setTile(x,0,1); setTile(x,MAP_H-1,1); }
     for(let y=0;y<MAP_H;y++){ setTile(0,y,1); setTile(MAP_W-1,y,1); }
   }
 
-  // Chapter 1: Quarantine Block (improved original vibe)
+  // ===== Maps =====
   function buildMapChapter1(){
     map.fill(0);
     buildOuterWalls();
 
-    // central courtyard ring
     rectWall(5,5, 44,25);
     setTile(24,5,0); setTile(25,5,0);
     setTile(5,14,0); setTile(5,15,0);
     setTile(44,14,0); setTile(44,15,0);
     setTile(24,25,0); setTile(25,25,0);
 
-    // two buildings inside
     rectWall(10,9, 18,14); setTile(14,14,2);
     rectWall(30,10, 38,17); setTile(34,10,2);
 
-    // corridor choke
     lineWall(23,10, 23,20);
     setTile(23,15,2);
 
-    // endless escape door exists only in Endless mode (placed on outer right)
+    // escape door tile exists here but ONLY meaningful in Endless
     setTile(MAP_W-2, Math.floor(MAP_H/2), 3);
   }
 
-  // Chapter 2: Forest Outskirts (outdoor + grass)
   function buildMapChapter2(){
     map.fill(0);
     buildOuterWalls();
 
-    // make most of map grass
+    // mostly grass
     fillRectTile(1,1, MAP_W-2, MAP_H-2, 4);
 
-    // dirt/clearing paths as floor
+    // clearings/paths
     fillRectTile(6,6, 43,24, 0);
     fillRectTile(1,15, 10,16, 0);
     fillRectTile(40,8, 48,9, 0);
     fillRectTile(20,1, 22,10, 0);
 
-    // cabin (small building)
+    // cabin
     rectWall(10,10, 18,15);
     setTile(14,15,2);
 
-    // ranger tower area (walls like a platform)
+    // tower block
     rectWall(32,8, 38,12);
     setTile(35,8,2);
 
-    // gas station-ish structure
+    // gas station-ish
     rectWall(26,18, 40,24);
     setTile(33,18,2);
-
-    // no escape door auto-finish in chapters; keep door tiles as normal doors only
-    // (we won’t place type 3 here)
   }
 
-  // Chapter 3: Dead Facility (tight indoor)
   function buildMapChapter3(){
     map.fill(0);
     buildOuterWalls();
 
-    // big interior facility walls / corridors
     rectWall(4,4, 45,27);
 
-    // corridor network
     lineWall(10,4, 10,27);
     lineWall(20,4, 20,27);
     lineWall(30,4, 30,27);
     lineWall(40,4, 40,27);
 
-    // horizontal splits
     lineWall(4,10, 45,10);
     lineWall(4,18, 45,18);
 
-    // doors at key junctions
     setTile(10,9,2); setTile(20,9,2); setTile(30,9,2); setTile(40,9,2);
     setTile(10,18,2); setTile(20,18,2); setTile(30,18,2); setTile(40,18,2);
 
-    // some rooms inside
     rectWall(6,6, 9,9);
     rectWall(22,12, 28,17);
     rectWall(32,20, 38,26);
@@ -540,8 +523,7 @@
   }
 
   function buildMapForSelection(){
-    if(gameMode === "ENDLESS"){
-      // Endless uses Chapter 1 map but with escape door active
+    if(gameMode === MODE.ENDLESS){
       buildMapChapter1();
       return;
     }
@@ -551,11 +533,11 @@
   }
 
   function findSafeSpawn(){
-    for(let tries=0; tries<1500; tries++){
+    for(let tries=0; tries<1800; tries++){
       const tx = Math.floor(randRange(6, MAP_W-6));
       const ty = Math.floor(randRange(6, MAP_H-6));
       const t = map[idx(tx,ty)];
-      if(t !== 0 && t !== 4) continue; // floor or grass
+      if(t !== 0 && t !== 4) continue;
       const x = tx*TILE + TILE/2;
       const y = ty*TILE + TILE/2;
       if(!collideWorldCircle(x,y, 14)) return {x,y};
@@ -563,7 +545,7 @@
     return {x: TILE*6, y: TILE*6};
   }
 
-  // ===== Player / Weapons =====
+  // ===== Weapons / Player =====
   const weapons = {
     pistol:    {name:"Pistol", cost: 0,   damage: 18, fireRate: 0.22, spread: 0.06, speed: 900,  durabilityLoss: 0.35, pellets: 1},
     smg:       {name:"SMG",    cost: 200, damage: 11, fireRate: 0.08, spread: 0.10, speed: 950,  durabilityLoss: 0.45, pellets: 1},
@@ -583,27 +565,33 @@
     durability: 100,
     god: false,
     infiniteMoney: false,
-    // XP system
-    level: 1,
-    xp: 0,
-    xpNext: 100,
-    damageBonus: 0,
+    level: 1, xp: 0, xpNext: 100, damageBonus: 0,
   };
   function currentWeapon(){ return weapons[player.gunId]; }
 
-  // ===== Bullets =====
+  // ===== Bullets / Zombies =====
   const bullets = [];
   let shootCooldown = 0;
 
-  // ===== Enemies =====
   const zombies = [];
   let wave = 0;
   let spawnBudget = 0;
   let spawnTick = 0;
 
-  // ===== Tools / build =====
-  let doorToolOwned = false;
+  // ===== Difficulty / Tools =====
+  let difficulty = { zombieHpMul: 1.0, zombieSpMul: 1.0, moneyMul: 1.0 };
+  function setDifficultyPreset(name){
+    const n = (name||"").toLowerCase();
+    if(n === "easy") difficulty = { zombieHpMul: 0.9, zombieSpMul: 0.95, moneyMul: 1.1 };
+    else if(n === "hard") difficulty = { zombieHpMul: 1.15, zombieSpMul: 1.08, moneyMul: 0.9 };
+    else difficulty = { zombieHpMul: 1.0, zombieSpMul: 1.0, moneyMul: 1.0 };
+    pushFeed("Difficulty: " + (n||"medium"));
+  }
 
+  let doorToolOwned = false;
+  let escapeDoorEnabled = true; // admin toggle for endless
+
+  // ===== Build wall =====
   function placeBuildWall(){
     const cost = 25;
     if(player.money < cost && !player.infiniteMoney) return pushFeed("Not enough money to build.");
@@ -632,7 +620,7 @@
     pushFeed("Built wall (-$"+cost+")");
   }
 
-  // ===== Helper hire =====
+  // ===== Helper =====
   const helper = {
     hired: false,
     activeThisWave: false,
@@ -651,6 +639,7 @@
     {label:"Door Tool ($300)", onBuy: () => buyDoorTool()},
     {label:"Hire Guard 1 Wave ($250)", onBuy: () => hireHelper()},
   ];
+
   function buildShopUI(){
     shopButtons.innerHTML = "";
     for(const it of shopItems){
@@ -707,7 +696,8 @@
     doorToolOwned = true;
     helper.hired = true;
     helper.usedThisWave = false;
-    announce("ADMIN MODE ENABLED", 2.6);
+    escapeDoorEnabled = true;
+    announce("ADMIN MODE ENABLED", 2.2);
     logAdmin("[ADMIN] Infinite money ON");
     logAdmin("[ADMIN] God mode ON");
     logAdmin("[ADMIN] Dev Blaster granted");
@@ -742,19 +732,12 @@
       const variance = last10.reduce((a,b)=>a+(b-mean)*(b-mean),0)/last10.length;
       if(variance < 2.2 && mean < 140){
         cheatThrottle = Math.max(cheatThrottle, 0.6);
-        pushFeed("Anti-cheat: macro-like clicks detected (throttled).");
+        pushFeed("Anti-cheat: macro-like clicks (throttled).");
       }
     }
   }
 
-  function setDifficultyPreset(name){
-    // tiny tuning knobs so chapters can feel different without breaking systems
-    const n = (name||"").toLowerCase();
-    if(n === "easy"){ difficulty = { zombieHpMul: 0.9, zombieSpMul: 0.95, moneyMul: 1.1 }; pushFeed("Difficulty: easy"); }
-    else if(n === "hard"){ difficulty = { zombieHpMul: 1.15, zombieSpMul: 1.08, moneyMul: 0.9 }; pushFeed("Difficulty: hard"); }
-    else { difficulty = { zombieHpMul: 1.0, zombieSpMul: 1.0, moneyMul: 1.0 }; pushFeed("Difficulty: medium"); }
-  }
-  let difficulty = { zombieHpMul: 1.0, zombieSpMul: 1.0, moneyMul: 1.0 };
+  let freezeZombies = false;
 
   function runAdminCommand(raw){
     const s = raw.trim();
@@ -765,10 +748,11 @@
     const cmd = (parts[0]||"").toLowerCase();
 
     if(cmd === "help"){
-      logAdmin("Core: help, god on/off, money N, heal N, wave +1, spawn N, give devblaster, clear");
-      logAdmin("Modes: endless, chapter 1/2/3, unlockchapters");
-      logAdmin("Tuning: difficulty easy/medium/hard, zoom N (0.65-1.45)");
-      logAdmin("Fun: clearzombies, freezezombies on/off");
+      logAdmin("help, clear");
+      logAdmin("god on/off | money N | heal N | give devblaster");
+      logAdmin("wave +1 | spawn N | clearzombies | freezezombies on/off");
+      logAdmin("endless | chapter 1/2/3 | difficulty easy/medium/hard | zoom N");
+      logAdmin("door on/off (escape door) | tool door (grant Door Tool)");
       return;
     }
     if(cmd === "clear"){ adminLog.value=""; return; }
@@ -816,7 +800,23 @@
         return;
       }
     }
-
+    if(cmd === "clearzombies"){ zombies.length = 0; logAdmin("Zombies cleared."); return; }
+    if(cmd === "freezezombies"){
+      freezeZombies = ((parts[1]||"").toLowerCase() === "on");
+      logAdmin("freezeZombies = " + freezeZombies);
+      return;
+    }
+    if(cmd === "difficulty"){
+      setDifficultyPreset(parts[1]||"medium");
+      logAdmin("difficulty set.");
+      return;
+    }
+    if(cmd === "zoom"){
+      const n = Number(parts[1]||1);
+      if(Number.isFinite(n)) zoom = clamp(n, 0.65, 1.45);
+      logAdmin("zoom = " + zoom.toFixed(2));
+      return;
+    }
     if(cmd === "endless"){
       gameMode = MODE.ENDLESS;
       currentChapter = 1;
@@ -836,39 +836,19 @@
       }
       return;
     }
-    if(cmd === "unlockchapters"){
-      chaptersUnlocked = true;
-      logAdmin("All chapters unlocked.");
-      pushFeed("Chapters unlocked.");
-      return;
-    }
-    if(cmd === "difficulty"){
-      setDifficultyPreset(parts[1]||"medium");
-      logAdmin("difficulty = " + (parts[1]||"medium"));
-      return;
-    }
-    if(cmd === "zoom"){
-      const n = Number(parts[1]||1);
-      if(Number.isFinite(n)) zoom = clamp(n, 0.65, 1.45);
-      logAdmin("zoom = " + zoom.toFixed(2));
-      return;
-    }
-    if(cmd === "clearzombies"){
-      zombies.length = 0;
-      logAdmin("Zombies cleared.");
-      return;
-    }
-    if(cmd === "freezezombies"){
+    if(cmd === "door"){
       const v = (parts[1]||"").toLowerCase();
-      freezeZombies = (v === "on");
-      logAdmin("freezeZombies = " + freezeZombies);
+      escapeDoorEnabled = (v === "on");
+      logAdmin("escapeDoorEnabled = " + escapeDoorEnabled);
       return;
+    }
+    if(cmd === "tool"){
+      const what = (parts[1]||"").toLowerCase();
+      if(what === "door"){ doorToolOwned = true; logAdmin("Door Tool granted."); return; }
     }
 
     logAdmin("Unknown command.");
   }
-
-  let freezeZombies = false;
 
   // ===== Input =====
   const keys = new Set();
@@ -943,8 +923,7 @@
     }
   };
 
-  btnMenu.onclick = () => showMenu("Back to menu.");
-
+  btnMenu.onclick = () => showMenu("Pick a mode");
   btnStart.onclick = () => startGame();
   btnPause.onclick = () => togglePause();
   btnFinish.onclick = () => finishGame(false);
@@ -978,43 +957,38 @@
     if(paused) pushFeed("Paused");
   }
 
-  // ===== Menu selection =====
-  function selectEndless(){
-    gameMode = MODE.ENDLESS;
-    currentChapter = 1;
-    setDifficultyPreset("medium");
-    menuStatus.textContent = "Endless selected";
-    hideMenu();
-    announce("ENDLESS MODE", 1.6);
-  }
-  function selectChapter(n){
-    gameMode = MODE.CHAPTER;
-    currentChapter = n;
-    // difficulty suggestions
-    if(n === 1) setDifficultyPreset("easy");
-    else if(n === 2) setDifficultyPreset("medium");
-    else setDifficultyPreset("hard");
-    menuStatus.textContent = `Chapter ${n} selected`;
-    hideMenu();
-    announce(`CHAPTER ${n}`, 1.6);
-  }
-  btnPickEndless.onclick = () => selectEndless();
-  btnPickCh1.onclick = () => selectChapter(1);
-  btnPickCh2.onclick = () => selectChapter(2);
-  btnPickCh3.onclick = () => selectChapter(3);
-
+  // ===== Menu =====
   function showMenu(text){
     menuStatus.textContent = text || "Pick a mode";
     menuOverlay.style.display = "grid";
-    // stop game but keep state safe
     paused = true;
     btnPause.textContent = "Resume";
   }
   function hideMenu(){
     menuOverlay.style.display = "none";
   }
+  function selectEndless(){
+    gameMode = MODE.ENDLESS;
+    currentChapter = 1;
+    setDifficultyPreset("medium");
+    hideMenu();
+    announce("ENDLESS MODE", 1.4);
+  }
+  function selectChapter(n){
+    gameMode = MODE.CHAPTER;
+    currentChapter = n;
+    if(n===1) setDifficultyPreset("easy");
+    else if(n===2) setDifficultyPreset("medium");
+    else setDifficultyPreset("hard");
+    hideMenu();
+    announce("CHAPTER " + n, 1.4);
+  }
+  btnPickEndless.onclick = () => selectEndless();
+  btnPickCh1.onclick = () => selectChapter(1);
+  btnPickCh2.onclick = () => selectChapter(2);
+  btnPickCh3.onclick = () => selectChapter(3);
 
-  // ===== Interactions (doors open; escape only in Endless) =====
+  // ===== Interactions (doors truly open) =====
   function interact(){
     const tx = Math.floor(player.x / TILE);
     const ty = Math.floor(player.y / TILE);
@@ -1035,14 +1009,18 @@
 
         if(t === 3){
           if(gameMode !== MODE.ENDLESS){
-            pushFeed("Escape door is disabled in Chapters (objectives coming next).");
+            pushFeed("Escape door is Endless-only.");
+            return;
+          }
+          if(!escapeDoorEnabled){
+            pushFeed("Escape door disabled (admin).");
             return;
           }
           if(!doorToolOwned){
             pushFeed("Escape door needs Door Tool.");
             return;
           }
-          announce("ESCAPED! RUN COMPLETE", 2.6);
+          announce("ESCAPED! RUN COMPLETE", 2.2);
           finishGame(true);
           return;
         }
@@ -1111,7 +1089,7 @@
     });
   }
 
-  // ===== Waves / Zombies =====
+  // ===== Waves / Spawning =====
   function startNextWave(){
     wave++;
     spawnTick = 0;
@@ -1123,11 +1101,11 @@
     helper.activeThisWave = helper.hired && !helper.usedThisWave;
     helper.usedThisWave = helper.hired ? true : false;
 
-    announce("WAVE " + wave, 2.0);
+    announce("WAVE " + wave, 1.8);
   }
 
   function spawnZombie(juggernaut){
-    for(let tries=0; tries<280; tries++){
+    for(let tries=0; tries<300; tries++){
       const edge = Math.floor(Math.random()*4);
       let tx, ty;
 
@@ -1178,6 +1156,7 @@
     }
   }
 
+  // ===== Zombie AI + breaking walls =====
   function nearestBuildWall(x,y, radius){
     let best = null, bestD = radius;
     for(const bw of buildWalls){
@@ -1209,7 +1188,6 @@
         tx = helper.x; ty = helper.y;
       }
 
-      // build wall blocking?
       const wall = nearestBuildWall(z.x,z.y, 55);
       if(wall && lineHitsRect(z.x,z.y, tx,ty, wall.x,wall.y,wall.w,wall.h)){
         const wx = (wall.x+wall.w/2) - z.x;
@@ -1232,17 +1210,14 @@
         continue;
       }
 
-      // chase
       const vx = tx - z.x, vy = ty - z.y;
       const d = Math.hypot(vx,vy) || 1;
 
-      // grass slows zombies a bit (chapter 2 feel)
       const tile = tileAtWorld(z.x, z.y);
       const grassSlow = isGrassTile(tile) ? 0.88 : 1.0;
 
       moveWithCollision(z, (vx/d)*z.speed*grassSlow*dt, (vy/d)*z.speed*grassSlow*dt);
 
-      // hit player
       const pd = Math.hypot(player.x - z.x, player.y - z.y);
       if(pd < player.r + z.r + 2){
         if(z.hitCooldown <= 0){
@@ -1270,7 +1245,6 @@
       const t = tileAtWorld(b.x,b.y);
       if(isSolidTile(t) || isDoorTile(t)){ bullets.splice(i,1); continue; }
 
-      // build walls
       for(const bw of buildWalls){
         if(circleRectOverlap(b.x,b.y,b.r, bw.x,bw.y,bw.w,bw.h)){
           bw.hp -= b.damage * 0.8;
@@ -1284,7 +1258,6 @@
       }
       if(i >= bullets.length) continue;
 
-      // zombies
       for(let z=zombies.length-1; z>=0; z--){
         const zz = zombies[z];
         if(Math.hypot(zz.x-b.x, zz.y-b.y) < zz.r + b.r){
@@ -1308,7 +1281,7 @@
     }
   }
 
-  // ===== XP / Leveling =====
+  // ===== XP =====
   function gainXP(amount){
     player.xp += amount;
     while(player.xp >= player.xpNext){
@@ -1320,11 +1293,11 @@
       player.hp = player.maxHp;
 
       player.damageBonus = clamp(player.damageBonus + 0.03, 0, 0.6);
-      announce("LEVEL UP! (" + player.level + ")", 2.2);
+      announce("LEVEL UP! (" + player.level + ")", 1.8);
     }
   }
 
-  // ===== Helper =====
+  // ===== Helper shooting =====
   function updateHelper(dt){
     if(!helper.activeThisWave) return;
 
@@ -1353,11 +1326,9 @@
     }
   }
 
-  // ===== UI / Game flow =====
+  // ===== Start/finish =====
   function startGame(){
-    // build correct map for mode/chapter
     buildMapForSelection();
-
     buildWalls.length = 0;
     bullets.length = 0;
     zombies.length = 0;
@@ -1369,7 +1340,6 @@
     const sp = findSafeSpawn();
     player.x = sp.x; player.y = sp.y;
 
-    // reset player
     player.hp = 100; player.maxHp = 100;
     player.score = 0;
     player.gunId = "pistol";
@@ -1380,12 +1350,12 @@
     player.xpNext = 100;
     player.damageBonus = 0;
 
-    // money start changes slightly by mode
     player.infiniteMoney = false;
     player.money = (gameMode === MODE.ENDLESS) ? 100 : 140;
     player.god = false;
 
     doorToolOwned = false;
+    escapeDoorEnabled = true;
 
     helper.hired = false;
     helper.activeThisWave = false;
@@ -1393,7 +1363,6 @@
     helper.x = player.x + 60;
     helper.y = player.y + 60;
 
-    // anti-cheat reset
     clickTimes = [];
     clickIntervals = [];
     cheatThrottle = 0;
@@ -1427,7 +1396,7 @@
     gameOver = true;
     paused = true;
     btnPause.textContent = "Resume";
-    announce("GAME OVER", 2.6);
+    announce("GAME OVER", 2.0);
   }
 
   function updateUI(){
@@ -1441,7 +1410,7 @@
     statXP.textContent = `Lvl ${player.level} | XP ${player.xp}/${player.xpNext}`;
   }
 
-  // ===== Drawing =====
+  // ===== Draw =====
   function drawTiles(){
     const camX = player.x + lookOffset.x;
     const camY = player.y + lookOffset.y;
@@ -1458,7 +1427,6 @@
         const t = map[idx(tx,ty)];
         const x = tx*TILE, y = ty*TILE;
 
-        // base floor/grass
         if(t === 4){
           ctx.fillStyle = ((tx+ty)%2===0) ? "rgba(90,180,90,0.14)" : "rgba(90,180,90,0.10)";
           ctx.fillRect(x,y,TILE,TILE);
@@ -1505,14 +1473,13 @@
     let y = canvas.height - 18 - 18*feed.length;
     for(const m of feed){
       ctx.fillStyle = "rgba(0,0,0,0.35)";
-      ctx.fillRect(12, y-2, 620, 18);
+      ctx.fillRect(12, y-2, 660, 18);
       ctx.fillStyle = "rgba(232,238,247,0.92)";
       ctx.fillText(m.text, 18, y);
       y += 18;
     }
     ctx.restore();
 
-    // crosshair
     ctx.save();
     ctx.strokeStyle = "rgba(255,255,255,0.55)";
     ctx.lineWidth = 2;
@@ -1560,7 +1527,6 @@
 
     drawTiles();
 
-    // build walls
     for(const bw of buildWalls){
       ctx.fillStyle = "#1c2a3f";
       ctx.fillRect(bw.x,bw.y,bw.w,bw.h);
@@ -1571,7 +1537,6 @@
       ctx.fillRect(bw.x, bw.y-6, bw.w*p, 4);
     }
 
-    // bullets
     ctx.fillStyle = "#e8eef7";
     for(const b of bullets){
       ctx.beginPath();
@@ -1579,7 +1544,6 @@
       ctx.fill();
     }
 
-    // zombies
     for(const z of zombies){
       ctx.fillStyle = (z.type==="juggernaut") ? "#c44" : "#6bd36b";
       ctx.beginPath();
@@ -1593,7 +1557,6 @@
       ctx.fillRect(z.x - z.r, z.y - z.r - 10, z.r*2*p, 5);
     }
 
-    // helper
     if(helper.activeThisWave){
       ctx.fillStyle = "#6bb7ff";
       ctx.beginPath();
@@ -1601,13 +1564,11 @@
       ctx.fill();
     }
 
-    // player
     ctx.fillStyle = "#ffd86b";
     ctx.beginPath();
     ctx.arc(player.x,player.y,player.r,0,Math.PI*2);
     ctx.fill();
 
-    // aim line
     ctx.strokeStyle = "rgba(255,255,255,0.20)";
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -1636,14 +1597,12 @@
     if(cheatThrottle > 0) cheatThrottle = Math.max(0, cheatThrottle - dt);
 
     if(running && !paused && !gameOver){
-      // movement
       if(!uiTyping){
         const up = keys.has("w"), down = keys.has("s"), left = keys.has("a"), right = keys.has("d");
         let mx = (right?1:0) - (left?1:0);
         let my = (down?1:0) - (up?1:0);
         if(mx || my){
           const n = norm(mx,my);
-          // walking on grass slows player slightly too (outdoor feel)
           const tile = tileAtWorld(player.x, player.y);
           const grassSlow = isGrassTile(tile) ? 0.95 : 1.0;
           moveWithCollision(player, n.x*player.speed*grassSlow*dt, n.y*player.speed*grassSlow*dt);
@@ -1665,7 +1624,8 @@
   // ===== Init =====
   function init(){
     buildShopUI();
-    announce("READY", 1.1);
+    buildMapChapter1();
+    announce("READY", 1.0);
     statMode.textContent = "Mode: —";
     btnStart.disabled = false;
     btnPause.disabled = true;
