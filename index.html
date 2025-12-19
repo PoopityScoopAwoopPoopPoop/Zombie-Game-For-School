@@ -1,0 +1,1681 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Zombie Invasion — Dev: Bradley</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin:0; background:#070a10; color:#e8eef7;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      user-select:none; overflow-x:hidden;
+    }
+    .topbar{
+      display:flex; flex-wrap:wrap; gap:8px; align-items:center;
+      padding:10px; background:#0f1621; border-bottom:1px solid #1e2a3a;
+      position:sticky; top:0; z-index:10;
+    }
+    button,input,textarea{
+      border:1px solid #2a3a52; background:#121b28; color:#e8eef7;
+      border-radius:10px; padding:8px 10px; font-size:14px; outline:none;
+    }
+    button{ cursor:pointer; }
+    button:hover{ filter:brightness(1.15); }
+    button:disabled{ opacity:.55; cursor:not-allowed; }
+    input{ min-width:160px; }
+    .stat{
+      padding:6px 10px; border:1px solid #1e2a3a; border-radius:10px; background:#0d141f;
+      font-variant-numeric: tabular-nums;
+      white-space:nowrap;
+    }
+    .badge{
+      display:inline-block; padding:2px 8px; border-radius:999px; border:1px solid #2a3a52;
+      background:#111b2a; font-size:12px; opacity:.95; white-space:nowrap;
+    }
+    .spacer{ flex:1; }
+    .wrap{ display:grid; place-items:center; padding:12px; gap:10px; }
+    canvas{
+      background: radial-gradient(1200px 800px at 50% 50%, #101a28 0%, #070a10 60%, #04060a 100%);
+      border:1px solid #1e2a3a; border-radius:16px;
+      box-shadow:0 10px 40px rgba(0,0,0,.55);
+      max-width:96vw; height:auto; display:block;
+    }
+    .panel{
+      width:min(1100px,96vw);
+      border:1px solid #1e2a3a; border-radius:16px; padding:10px; background:#0d141f;
+      display:none; gap:10px;
+    }
+    .panel.active{ display:grid; }
+    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    textarea{
+      width:100%; min-height:120px; resize:vertical;
+      border-radius:12px; border:1px solid #2a3a52; background:#0b1220; color:#e8eef7;
+      padding:10px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size:13px; outline:none;
+    }
+    .hint{ opacity:.85; font-size:13px; line-height:1.35; }
+    .kbd{ padding:1px 6px; border:1px solid #2a3a52; background:#0b1220; border-radius:6px; font-family: ui-monospace, monospace; }
+
+    /* Modals */
+    .modalBackdrop{
+      position:fixed; inset:0; background:rgba(0,0,0,.65);
+      display:none; place-items:center; z-index:20; padding:16px;
+    }
+    .modalBackdrop.show{ display:grid; }
+    .modal{
+      width:min(900px,96vw);
+      background:#0d141f; border:1px solid #1e2a3a; border-radius:16px;
+      padding:14px; box-shadow:0 20px 60px rgba(0,0,0,.6);
+    }
+    .modal h2{ margin:0 0 8px 0; font-size:18px; }
+    .modal ul{ margin:8px 0; padding-left:20px; }
+
+    /* Menu overlay */
+    .menuOverlay{
+      position:fixed; inset:0;
+      display:grid; place-items:center;
+      background: radial-gradient(1200px 800px at 50% 40%, rgba(16,26,40,.92) 0%, rgba(7,10,16,.94) 55%, rgba(4,6,10,.98) 100%);
+      z-index:30; padding:18px;
+    }
+    .menuCard{
+      width:min(920px, 96vw);
+      border:1px solid #1e2a3a; border-radius:18px;
+      background:rgba(13,20,31,.9);
+      box-shadow:0 20px 60px rgba(0,0,0,.6);
+      padding:16px;
+      display:grid; gap:14px;
+    }
+    .menuTitle{
+      display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap;
+    }
+    .menuTitle h1{ margin:0; font-size:22px; letter-spacing:.2px; }
+    .menuGrid{
+      display:grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap:12px;
+    }
+    .modeCard{
+      border:1px solid #1e2a3a; border-radius:16px;
+      background:#0b1220; padding:12px;
+      display:grid; gap:10px;
+    }
+    .modeCard h3{ margin:0; font-size:16px; }
+    .modeCard p{ margin:0; opacity:.85; font-size:13px; line-height:1.35; }
+    .modeCard .row{ justify-content:flex-start; }
+  </style>
+</head>
+
+<body>
+  <div class="topbar">
+    <span class="stat">Dev: Bradley</span>
+
+    <button id="btnMenu">Menu</button>
+    <button id="btnStart">Start</button>
+    <button id="btnPause" disabled>Pause</button>
+    <button id="btnFinish" disabled>Finish</button>
+    <button id="btnFullscreen">Fullscreen</button>
+    <button id="btnControls">Controls</button>
+    <button id="btnChangelog">Changelog</button>
+
+    <span class="stat" id="statMode">Mode: —</span>
+    <span class="stat" id="statWave">Wave: 0</span>
+    <span class="stat" id="statHP">HP: 100</span>
+    <span class="stat" id="statXP">Lvl 1 | XP 0/100</span>
+    <span class="stat" id="statMoney">Money: 0</span>
+    <span class="stat" id="statGun">Gun: Pistol</span>
+    <span class="stat" id="statDur">Dur: 100%</span>
+    <span class="stat" id="statZ">Zombies: 0</span>
+
+    <span class="spacer"></span>
+
+    <input id="codeInput" placeholder="Enter code..." />
+    <button id="btnCode">Submit</button>
+    <span id="codeStatus" class="badge">No admin</span>
+  </div>
+
+  <div class="wrap">
+    <canvas id="game" width="1100" height="650" tabindex="0"></canvas>
+
+    <div id="shopPanel" class="panel active">
+      <div class="row">
+        <span class="badge">Shop</span>
+        <span class="hint">
+          <span class="kbd">B</span> toggle shop • <span class="kbd">F</span> build wall • <span class="kbd">E</span> interact • <span class="kbd">P</span> pause
+        </span>
+      </div>
+      <div class="row" id="shopButtons"></div>
+      <div class="hint">
+        Build walls create chokepoints (zombies can break them). Purple escape door exists in Endless mode. Chapters are free-roam maps (objectives come next).
+        Hold right-click to look around, scroll wheel zoom.
+      </div>
+    </div>
+
+    <div id="adminPanel" class="panel">
+      <div class="row">
+        <span class="badge">Admin Console</span>
+        <span class="hint">Type a command and press <b>Enter</b>.</span>
+      </div>
+      <textarea id="adminLog" readonly></textarea>
+      <div class="row">
+        <input id="adminCmd" placeholder="Command (help)" style="flex:1; min-width:260px;" />
+        <button id="btnRunCmd">Run</button>
+        <button id="btnClearLog">Clear</button>
+      </div>
+      <div class="hint">
+        Try: <code>help</code>, <code>endless</code>, <code>chapter 1</code>, <code>chapter 2</code>, <code>chapter 3</code>, <code>unlockchapters</code>, <code>difficulty easy/medium/hard</code>
+      </div>
+    </div>
+  </div>
+
+  <!-- MENU -->
+  <div id="menuOverlay" class="menuOverlay">
+    <div class="menuCard">
+      <div class="menuTitle">
+        <h1>Zombie Invasion</h1>
+        <span class="badge" id="menuStatus">Pick a mode</span>
+      </div>
+
+      <div class="menuGrid">
+        <div class="modeCard">
+          <h3>Endless Mode (Original) — Classic</h3>
+          <p>This is your original experience: infinite waves, escape door works, finish button works. Nothing changed.</p>
+          <div class="row">
+            <button id="btnPickEndless">Play Endless</button>
+          </div>
+        </div>
+
+        <div class="modeCard">
+          <h3>Chapter 1: Quarantine Block — Easy</h3>
+          <p>Original-style map (improved layout). Free roam. Objectives system comes next.</p>
+          <div class="row">
+            <button id="btnPickCh1">Play Chapter 1</button>
+          </div>
+        </div>
+
+        <div class="modeCard">
+          <h3>Chapter 2: Forest Outskirts — Medium</h3>
+          <p>Bigger outdoor map with grass. Grass slightly slows zombies. Indoor + outdoor combat.</p>
+          <div class="row">
+            <button id="btnPickCh2">Play Chapter 2</button>
+          </div>
+        </div>
+
+        <div class="modeCard">
+          <h3>Chapter 3: Dead Facility — Hard</h3>
+          <p>Underground facility layout. Tighter corridors, tougher pacing.</p>
+          <div class="row">
+            <button id="btnPickCh3">Play Chapter 3</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="hint">
+        <b>Note:</b> Chapters are now about <i>roaming big maps</i>. Next upgrade after your review: keys + tools + objectives (Piggy-style).
+      </div>
+    </div>
+  </div>
+
+  <!-- Controls Modal -->
+  <div id="modalControls" class="modalBackdrop">
+    <div class="modal">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+        <h2>Controls</h2>
+        <button id="btnCloseControls">Close</button>
+      </div>
+      <ul>
+        <li><b>WASD</b> move</li>
+        <li><b>Mouse</b> aim</li>
+        <li><b>Left click</b> shoot</li>
+        <li><b>Right mouse hold</b> look around (camera offset)</li>
+        <li><b>Scroll wheel</b> zoom</li>
+        <li><b>F</b> build wall (cost money)</li>
+        <li><b>E</b> interact (open doors / escape door in Endless)</li>
+        <li><b>B</b> toggle shop</li>
+        <li><b>P</b> pause/resume</li>
+        <li><b>Menu</b> returns to main menu</li>
+      </ul>
+      <div class="hint">
+        <b>Tip:</b> Click once on the canvas after Start so keyboard input feels instant.
+      </div>
+    </div>
+  </div>
+
+  <!-- Changelog Modal -->
+  <div id="modalChangelog" class="modalBackdrop">
+    <div class="modal">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+        <h2>Changelog</h2>
+        <button id="btnCloseChangelog">Close</button>
+      </div>
+      <div class="hint" style="margin-top:8px;">
+        <b>v0.5 — Chapters + Maps</b>
+        <ul>
+          <li>Added Main Menu + Chapter Select.</li>
+          <li>Endless Mode preserved (original gameplay unchanged).</li>
+          <li>Added Chapter 1/2/3 maps (bigger roamable spaces).</li>
+          <li>Chapter 2 includes outdoor grass that slightly slows zombies.</li>
+          <li>Admin commands expanded (chapter switching, difficulty presets, unlock chapters).</li>
+          <li>Next planned upgrade: Piggy-style objectives (keys/tools/doors).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  // ===== Canvas =====
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d", { alpha: false });
+
+  // ===== UI =====
+  const btnMenu = document.getElementById("btnMenu");
+  const btnStart = document.getElementById("btnStart");
+  const btnPause = document.getElementById("btnPause");
+  const btnFinish = document.getElementById("btnFinish");
+  const btnFullscreen = document.getElementById("btnFullscreen");
+  const btnControls = document.getElementById("btnControls");
+  const btnChangelog = document.getElementById("btnChangelog");
+
+  const menuOverlay = document.getElementById("menuOverlay");
+  const menuStatus = document.getElementById("menuStatus");
+  const btnPickEndless = document.getElementById("btnPickEndless");
+  const btnPickCh1 = document.getElementById("btnPickCh1");
+  const btnPickCh2 = document.getElementById("btnPickCh2");
+  const btnPickCh3 = document.getElementById("btnPickCh3");
+
+  const modalControls = document.getElementById("modalControls");
+  const btnCloseControls = document.getElementById("btnCloseControls");
+
+  const modalChangelog = document.getElementById("modalChangelog");
+  const btnCloseChangelog = document.getElementById("btnCloseChangelog");
+
+  const statMode = document.getElementById("statMode");
+  const statWave = document.getElementById("statWave");
+  const statHP = document.getElementById("statHP");
+  const statXP = document.getElementById("statXP");
+  const statMoney = document.getElementById("statMoney");
+  const statGun = document.getElementById("statGun");
+  const statDur = document.getElementById("statDur");
+  const statZ = document.getElementById("statZ");
+
+  const shopPanel = document.getElementById("shopPanel");
+  const shopButtons = document.getElementById("shopButtons");
+
+  const codeInput = document.getElementById("codeInput");
+  const btnCode = document.getElementById("btnCode");
+  const codeStatus = document.getElementById("codeStatus");
+
+  const adminPanel = document.getElementById("adminPanel");
+  const adminLog = document.getElementById("adminLog");
+  const adminCmd = document.getElementById("adminCmd");
+  const btnRunCmd = document.getElementById("btnRunCmd");
+  const btnClearLog = document.getElementById("btnClearLog");
+
+  // ===== Game State =====
+  let running = false;
+  let paused = false;
+  let gameOver = false;
+
+  // Typing lock
+  let uiTyping = false;
+  function lockInput(el){
+    el.addEventListener("focus", () => uiTyping = true);
+    el.addEventListener("blur", () => uiTyping = false);
+  }
+  lockInput(codeInput);
+  lockInput(adminCmd);
+
+  // ===== Modes / Chapters =====
+  const MODE = { ENDLESS: "ENDLESS", CHAPTER: "CHAPTER" };
+  let gameMode = MODE.ENDLESS;
+  let currentChapter = 1;
+  let chaptersUnlocked = true; // all playable now; can lock later if you want
+
+  function modeLabel(){
+    if(gameMode === MODE.ENDLESS) return "Endless (Original)";
+    return `Chapter ${currentChapter}`;
+  }
+
+  // ===== Messages / announcements =====
+  let bannerText = "";
+  let bannerT = 0;
+  const feed = [];
+  function announce(text, seconds=2.2){
+    bannerText = text;
+    bannerT = seconds;
+    pushFeed(text);
+  }
+  function pushFeed(text){
+    feed.unshift({text, t: 4.2});
+    if(feed.length > 7) feed.pop();
+  }
+
+  // ===== Camera / zoom / look =====
+  let zoom = 1.0;
+  let looking = false;
+  let lookOffset = {x:0, y:0};
+  let mouse = {x: canvas.width/2, y: canvas.height/2, worldX:0, worldY:0, down:false, rdown:false};
+
+  // ===== World =====
+  const TILE = 40;
+  const MAP_W = 50;              // bigger base map size
+  const MAP_H = 32;
+  const WORLD_W = MAP_W * TILE;
+  const WORLD_H = MAP_H * TILE;
+
+  // tile types:
+  // 0 floor, 1 wall, 2 door, 3 escape door (endless), 4 grass (outdoor)
+  const map = new Array(MAP_W*MAP_H).fill(0);
+
+  function idx(tx, ty){ return ty*MAP_W + tx; }
+  function inBounds(tx,ty){ return tx>=0 && ty>=0 && tx<MAP_W && ty<MAP_H; }
+  function setTile(tx,ty,t){ if(inBounds(tx,ty)) map[idx(tx,ty)] = t; }
+  function clamp(v,a,b){ return Math.max(a, Math.min(b,v)); }
+  function norm(x,y){
+    const l = Math.hypot(x,y) || 1;
+    return {x:x/l, y:y/l};
+  }
+  function randRange(a,b){ return a + Math.random()*(b-a); }
+  function rectsOverlap(x1,y1,w1,h1, x2,y2,w2,h2){
+    return x1 < x2+w2 && x1+w1 > x2 && y1 < y2+h2 && y1+h1 > y2;
+  }
+  function circleRectOverlap(cx,cy,cr, rx,ry,rw,rh){
+    const closestX = clamp(cx, rx, rx+rw);
+    const closestY = clamp(cy, ry, ry+rh);
+    const dx = cx - closestX, dy = cy - closestY;
+    return dx*dx + dy*dy <= cr*cr;
+  }
+  function isSolidTile(t){ return t === 1; }
+  function isDoorTile(t){ return t === 2 || t === 3; }
+  function isGrassTile(t){ return t === 4; }
+
+  function tileAtWorld(x,y){
+    const tx = Math.floor(x / TILE);
+    const ty = Math.floor(y / TILE);
+    if(!inBounds(tx,ty)) return 1;
+    return map[idx(tx,ty)];
+  }
+
+  // Buildable walls
+  const buildWalls = []; // {x,y,w,h,hp,maxHp}
+
+  function collideWorldCircle(x,y,r){
+    const minTx = Math.floor((x-r)/TILE), maxTx = Math.floor((x+r)/TILE);
+    const minTy = Math.floor((y-r)/TILE), maxTy = Math.floor((y+r)/TILE);
+    for(let ty=minTy; ty<=maxTy; ty++){
+      for(let tx=minTx; tx<=maxTx; tx++){
+        if(!inBounds(tx,ty)) return true;
+        const t = map[idx(tx,ty)];
+        if(isSolidTile(t) || isDoorTile(t)){
+          const rx = tx*TILE, ry = ty*TILE;
+          if(circleRectOverlap(x,y,r, rx,ry,TILE,TILE)) return true;
+        }
+      }
+    }
+    for(const bw of buildWalls){
+      if(circleRectOverlap(x,y,r, bw.x,bw.y,bw.w,bw.h)) return true;
+    }
+    return false;
+  }
+
+  function moveWithCollision(ent, dx, dy){
+    let nx = ent.x + dx;
+    if(!collideWorldCircle(nx, ent.y, ent.r)) ent.x = nx;
+    let ny = ent.y + dy;
+    if(!collideWorldCircle(ent.x, ny, ent.r)) ent.y = ny;
+  }
+
+  function rectWall(x1,y1,x2,y2){
+    for(let x=x1;x<=x2;x++){ setTile(x,y1,1); setTile(x,y2,1); }
+    for(let y=y1;y<=y2;y++){ setTile(x1,y,1); setTile(x2,y,1); }
+  }
+  function lineWall(x1,y1,x2,y2){
+    if(x1===x2){
+      const [a,b]= y1<y2?[y1,y2]:[y2,y1];
+      for(let y=a;y<=b;y++) setTile(x1,y,1);
+    }else if(y1===y2){
+      const [a,b]= x1<x2?[x1,x2]:[x2,x1];
+      for(let x=a;x<=b;x++) setTile(x,y1,1);
+    }
+  }
+  function fillRectTile(x1,y1,x2,y2,t){
+    for(let y=y1;y<=y2;y++){
+      for(let x=x1;x<=x2;x++){
+        setTile(x,y,t);
+      }
+    }
+  }
+
+  // ===== Chapter Maps =====
+  function buildOuterWalls(){
+    for(let x=0;x<MAP_W;x++){ setTile(x,0,1); setTile(x,MAP_H-1,1); }
+    for(let y=0;y<MAP_H;y++){ setTile(0,y,1); setTile(MAP_W-1,y,1); }
+  }
+
+  // Chapter 1: Quarantine Block (improved original vibe)
+  function buildMapChapter1(){
+    map.fill(0);
+    buildOuterWalls();
+
+    // central courtyard ring
+    rectWall(5,5, 44,25);
+    setTile(24,5,0); setTile(25,5,0);
+    setTile(5,14,0); setTile(5,15,0);
+    setTile(44,14,0); setTile(44,15,0);
+    setTile(24,25,0); setTile(25,25,0);
+
+    // two buildings inside
+    rectWall(10,9, 18,14); setTile(14,14,2);
+    rectWall(30,10, 38,17); setTile(34,10,2);
+
+    // corridor choke
+    lineWall(23,10, 23,20);
+    setTile(23,15,2);
+
+    // endless escape door exists only in Endless mode (placed on outer right)
+    setTile(MAP_W-2, Math.floor(MAP_H/2), 3);
+  }
+
+  // Chapter 2: Forest Outskirts (outdoor + grass)
+  function buildMapChapter2(){
+    map.fill(0);
+    buildOuterWalls();
+
+    // make most of map grass
+    fillRectTile(1,1, MAP_W-2, MAP_H-2, 4);
+
+    // dirt/clearing paths as floor
+    fillRectTile(6,6, 43,24, 0);
+    fillRectTile(1,15, 10,16, 0);
+    fillRectTile(40,8, 48,9, 0);
+    fillRectTile(20,1, 22,10, 0);
+
+    // cabin (small building)
+    rectWall(10,10, 18,15);
+    setTile(14,15,2);
+
+    // ranger tower area (walls like a platform)
+    rectWall(32,8, 38,12);
+    setTile(35,8,2);
+
+    // gas station-ish structure
+    rectWall(26,18, 40,24);
+    setTile(33,18,2);
+
+    // no escape door auto-finish in chapters; keep door tiles as normal doors only
+    // (we won’t place type 3 here)
+  }
+
+  // Chapter 3: Dead Facility (tight indoor)
+  function buildMapChapter3(){
+    map.fill(0);
+    buildOuterWalls();
+
+    // big interior facility walls / corridors
+    rectWall(4,4, 45,27);
+
+    // corridor network
+    lineWall(10,4, 10,27);
+    lineWall(20,4, 20,27);
+    lineWall(30,4, 30,27);
+    lineWall(40,4, 40,27);
+
+    // horizontal splits
+    lineWall(4,10, 45,10);
+    lineWall(4,18, 45,18);
+
+    // doors at key junctions
+    setTile(10,9,2); setTile(20,9,2); setTile(30,9,2); setTile(40,9,2);
+    setTile(10,18,2); setTile(20,18,2); setTile(30,18,2); setTile(40,18,2);
+
+    // some rooms inside
+    rectWall(6,6, 9,9);
+    rectWall(22,12, 28,17);
+    rectWall(32,20, 38,26);
+
+    setTile(22,12,2);
+    setTile(38,23,2);
+  }
+
+  function buildMapForSelection(){
+    if(gameMode === "ENDLESS"){
+      // Endless uses Chapter 1 map but with escape door active
+      buildMapChapter1();
+      return;
+    }
+    if(currentChapter === 1) buildMapChapter1();
+    else if(currentChapter === 2) buildMapChapter2();
+    else buildMapChapter3();
+  }
+
+  function findSafeSpawn(){
+    for(let tries=0; tries<1500; tries++){
+      const tx = Math.floor(randRange(6, MAP_W-6));
+      const ty = Math.floor(randRange(6, MAP_H-6));
+      const t = map[idx(tx,ty)];
+      if(t !== 0 && t !== 4) continue; // floor or grass
+      const x = tx*TILE + TILE/2;
+      const y = ty*TILE + TILE/2;
+      if(!collideWorldCircle(x,y, 14)) return {x,y};
+    }
+    return {x: TILE*6, y: TILE*6};
+  }
+
+  // ===== Player / Weapons =====
+  const weapons = {
+    pistol:    {name:"Pistol", cost: 0,   damage: 18, fireRate: 0.22, spread: 0.06, speed: 900,  durabilityLoss: 0.35, pellets: 1},
+    smg:       {name:"SMG",    cost: 200, damage: 11, fireRate: 0.08, spread: 0.10, speed: 950,  durabilityLoss: 0.45, pellets: 1},
+    shotgun:   {name:"Shotgun",cost: 350, damage: 9,  fireRate: 0.55, spread: 0.22, speed: 850,  durabilityLoss: 0.85, pellets: 7},
+    rifle:     {name:"Rifle",  cost: 550, damage: 28, fireRate: 0.16, spread: 0.04, speed: 1100, durabilityLoss: 0.55, pellets: 1},
+    devblaster:{name:"Dev Blaster", cost: 0, damage: 75, fireRate: 0.10, spread: 0.02, speed: 1400, durabilityLoss: 0.0, pellets: 1, special:true},
+  };
+
+  const player = {
+    x: WORLD_W*0.22, y: WORLD_H*0.55,
+    r: 14,
+    speed: 280,
+    hp: 100, maxHp: 100,
+    money: 0,
+    score: 0,
+    gunId: "pistol",
+    durability: 100,
+    god: false,
+    infiniteMoney: false,
+    // XP system
+    level: 1,
+    xp: 0,
+    xpNext: 100,
+    damageBonus: 0,
+  };
+  function currentWeapon(){ return weapons[player.gunId]; }
+
+  // ===== Bullets =====
+  const bullets = [];
+  let shootCooldown = 0;
+
+  // ===== Enemies =====
+  const zombies = [];
+  let wave = 0;
+  let spawnBudget = 0;
+  let spawnTick = 0;
+
+  // ===== Tools / build =====
+  let doorToolOwned = false;
+
+  function placeBuildWall(){
+    const cost = 25;
+    if(player.money < cost && !player.infiniteMoney) return pushFeed("Not enough money to build.");
+
+    const dir = norm(mouse.worldX - player.x, mouse.worldY - player.y);
+    const px = player.x + dir.x * 50;
+    const py = player.y + dir.y * 50;
+
+    const tx = Math.floor(px / TILE);
+    const ty = Math.floor(py / TILE);
+    if(!inBounds(tx,ty)) return;
+
+    const t = map[idx(tx,ty)];
+    if(t !== 0 && t !== 4) return pushFeed("Can't build there.");
+
+    const x = tx*TILE + TILE*0.15;
+    const y = ty*TILE + TILE*0.15;
+    const w = TILE*0.7, h = TILE*0.7;
+
+    for(const bw of buildWalls){
+      if(rectsOverlap(x,y,w,h, bw.x,bw.y,bw.w,bw.h)) return pushFeed("Too close to another wall.");
+    }
+
+    if(!player.infiniteMoney) player.money -= cost;
+    buildWalls.push({x,y,w,h,hp: 180, maxHp:180});
+    pushFeed("Built wall (-$"+cost+")");
+  }
+
+  // ===== Helper hire =====
+  const helper = {
+    hired: false,
+    activeThisWave: false,
+    usedThisWave: false,
+    x: 0, y: 0,
+    fireCooldown: 0,
+    damage: 10,
+  };
+
+  // ===== Shop =====
+  const shopItems = [
+    {label:"Buy SMG ($200)", onBuy: () => buyWeapon("smg")},
+    {label:"Buy Shotgun ($350)", onBuy: () => buyWeapon("shotgun")},
+    {label:"Buy Rifle ($550)", onBuy: () => buyWeapon("rifle")},
+    {label:"Repair Weapon ($120)", onBuy: () => repairWeapon()},
+    {label:"Door Tool ($300)", onBuy: () => buyDoorTool()},
+    {label:"Hire Guard 1 Wave ($250)", onBuy: () => hireHelper()},
+  ];
+  function buildShopUI(){
+    shopButtons.innerHTML = "";
+    for(const it of shopItems){
+      const b = document.createElement("button");
+      b.textContent = it.label;
+      b.onclick = it.onBuy;
+      shopButtons.appendChild(b);
+    }
+  }
+  function buyWeapon(id){
+    const w = weapons[id];
+    if(!w) return;
+    if(player.money < w.cost && !player.infiniteMoney) return pushFeed("Not enough money.");
+    if(!player.infiniteMoney) player.money -= w.cost;
+    player.gunId = id;
+    pushFeed("Equipped: " + w.name);
+  }
+  function repairWeapon(){
+    const cost = 120;
+    if(player.money < cost && !player.infiniteMoney) return pushFeed("Not enough money.");
+    if(!player.infiniteMoney) player.money -= cost;
+    player.durability = 100;
+    pushFeed("Weapon repaired.");
+  }
+  function buyDoorTool(){
+    const cost = 300;
+    if(doorToolOwned) return pushFeed("You already own Door Tool.");
+    if(player.money < cost && !player.infiniteMoney) return pushFeed("Not enough money.");
+    if(!player.infiniteMoney) player.money -= cost;
+    doorToolOwned = true;
+    pushFeed("Door Tool acquired.");
+  }
+  function hireHelper(){
+    const cost = 250;
+    if(player.money < cost && !player.infiniteMoney) return pushFeed("Not enough money.");
+    if(!player.infiniteMoney) player.money -= cost;
+    helper.hired = true;
+    helper.usedThisWave = false;
+    pushFeed("Guard hired for 1 wave (starts next wave).");
+  }
+
+  // ===== Admin =====
+  let adminUnlocked = false;
+  function logAdmin(msg){
+    adminLog.value += msg + "\n";
+    adminLog.scrollTop = adminLog.scrollHeight;
+  }
+  function grantAdminLoadout(){
+    player.infiniteMoney = true;
+    player.money = 999999;
+    player.god = true;
+    player.durability = 100;
+    player.gunId = "devblaster";
+    doorToolOwned = true;
+    helper.hired = true;
+    helper.usedThisWave = false;
+    announce("ADMIN MODE ENABLED", 2.6);
+    logAdmin("[ADMIN] Infinite money ON");
+    logAdmin("[ADMIN] God mode ON");
+    logAdmin("[ADMIN] Dev Blaster granted");
+    logAdmin("[ADMIN] Door Tool granted");
+    logAdmin("[ADMIN] Anti-cheat bypass ON");
+  }
+
+  // ===== Anti-cheat =====
+  let clickTimes = [];
+  let clickIntervals = [];
+  let cheatThrottle = 0;
+  function registerClick(){
+    if(adminUnlocked) return;
+    const now = performance.now();
+
+    if(clickTimes.length > 0){
+      const dt = now - clickTimes[clickTimes.length-1];
+      clickIntervals.push(dt);
+      if(clickIntervals.length > 20) clickIntervals.shift();
+    }
+
+    clickTimes.push(now);
+    clickTimes = clickTimes.filter(t => now - t < 1000);
+    if(clickTimes.length > 14){
+      cheatThrottle = Math.max(cheatThrottle, 0.45);
+      pushFeed("Anti-cheat: clicking too fast (throttled).");
+    }
+
+    if(clickIntervals.length >= 10){
+      const last10 = clickIntervals.slice(-10);
+      const mean = last10.reduce((a,b)=>a+b,0)/last10.length;
+      const variance = last10.reduce((a,b)=>a+(b-mean)*(b-mean),0)/last10.length;
+      if(variance < 2.2 && mean < 140){
+        cheatThrottle = Math.max(cheatThrottle, 0.6);
+        pushFeed("Anti-cheat: macro-like clicks detected (throttled).");
+      }
+    }
+  }
+
+  function setDifficultyPreset(name){
+    // tiny tuning knobs so chapters can feel different without breaking systems
+    const n = (name||"").toLowerCase();
+    if(n === "easy"){ difficulty = { zombieHpMul: 0.9, zombieSpMul: 0.95, moneyMul: 1.1 }; pushFeed("Difficulty: easy"); }
+    else if(n === "hard"){ difficulty = { zombieHpMul: 1.15, zombieSpMul: 1.08, moneyMul: 0.9 }; pushFeed("Difficulty: hard"); }
+    else { difficulty = { zombieHpMul: 1.0, zombieSpMul: 1.0, moneyMul: 1.0 }; pushFeed("Difficulty: medium"); }
+  }
+  let difficulty = { zombieHpMul: 1.0, zombieSpMul: 1.0, moneyMul: 1.0 };
+
+  function runAdminCommand(raw){
+    const s = raw.trim();
+    if(!s) return;
+    logAdmin("> " + s);
+
+    const parts = s.split(/\s+/);
+    const cmd = (parts[0]||"").toLowerCase();
+
+    if(cmd === "help"){
+      logAdmin("Core: help, god on/off, money N, heal N, wave +1, spawn N, give devblaster, clear");
+      logAdmin("Modes: endless, chapter 1/2/3, unlockchapters");
+      logAdmin("Tuning: difficulty easy/medium/hard, zoom N (0.65-1.45)");
+      logAdmin("Fun: clearzombies, freezezombies on/off");
+      return;
+    }
+    if(cmd === "clear"){ adminLog.value=""; return; }
+
+    if(cmd === "god"){
+      const v = (parts[1]||"").toLowerCase();
+      player.god = (v==="on");
+      logAdmin("god = " + player.god);
+      return;
+    }
+    if(cmd === "money"){
+      const n = Number(parts[1]||0);
+      if(Number.isFinite(n)){
+        player.money = Math.max(0, Math.floor(n));
+        player.infiniteMoney = (player.money >= 999999);
+      }
+      logAdmin("money = " + player.money);
+      return;
+    }
+    if(cmd === "heal"){
+      const n = Number(parts[1]||0);
+      if(Number.isFinite(n)) player.hp = clamp(player.hp + n, 0, player.maxHp);
+      logAdmin("hp = " + player.hp);
+      return;
+    }
+    if(cmd === "wave"){
+      if(parts[1] === "+1"){ startNextWave(); return; }
+      logAdmin("Try: wave +1");
+      return;
+    }
+    if(cmd === "spawn"){
+      const n = Number(parts[1]||0);
+      if(Number.isFinite(n)){
+        for(let i=0;i<Math.floor(n);i++) spawnZombie(false);
+        logAdmin("Spawned " + Math.floor(n));
+      }
+      return;
+    }
+    if(cmd === "give"){
+      const what = (parts[1]||"").toLowerCase();
+      if(what === "devblaster"){
+        player.gunId = "devblaster";
+        player.durability = 100;
+        logAdmin("Dev Blaster equipped.");
+        return;
+      }
+    }
+
+    if(cmd === "endless"){
+      gameMode = MODE.ENDLESS;
+      currentChapter = 1;
+      logAdmin("Mode set: Endless");
+      showMenu("Endless selected. Press Start.");
+      return;
+    }
+    if(cmd === "chapter"){
+      const n = Number(parts[1]||1);
+      if([1,2,3].includes(n)){
+        gameMode = MODE.CHAPTER;
+        currentChapter = n;
+        logAdmin("Mode set: Chapter " + n);
+        showMenu("Chapter " + n + " selected. Press Start.");
+      } else {
+        logAdmin("Use: chapter 1 / chapter 2 / chapter 3");
+      }
+      return;
+    }
+    if(cmd === "unlockchapters"){
+      chaptersUnlocked = true;
+      logAdmin("All chapters unlocked.");
+      pushFeed("Chapters unlocked.");
+      return;
+    }
+    if(cmd === "difficulty"){
+      setDifficultyPreset(parts[1]||"medium");
+      logAdmin("difficulty = " + (parts[1]||"medium"));
+      return;
+    }
+    if(cmd === "zoom"){
+      const n = Number(parts[1]||1);
+      if(Number.isFinite(n)) zoom = clamp(n, 0.65, 1.45);
+      logAdmin("zoom = " + zoom.toFixed(2));
+      return;
+    }
+    if(cmd === "clearzombies"){
+      zombies.length = 0;
+      logAdmin("Zombies cleared.");
+      return;
+    }
+    if(cmd === "freezezombies"){
+      const v = (parts[1]||"").toLowerCase();
+      freezeZombies = (v === "on");
+      logAdmin("freezeZombies = " + freezeZombies);
+      return;
+    }
+
+    logAdmin("Unknown command.");
+  }
+
+  let freezeZombies = false;
+
+  // ===== Input =====
+  const keys = new Set();
+
+  window.addEventListener("keydown", (e) => {
+    if(uiTyping) return;
+    const k = e.key.toLowerCase();
+    keys.add(k);
+
+    if(running && (k==="w"||k==="a"||k==="s"||k==="d"||k==="arrowup"||k==="arrowdown"||k==="arrowleft"||k==="arrowright"||k===" ")){
+      e.preventDefault();
+    }
+
+    if(k === "b") toggleShop();
+    if(k === "p") togglePause();
+    if(k === "f") { if(running && !paused && !gameOver) placeBuildWall(); }
+    if(k === "e") { if(running && !paused && !gameOver) interact(); }
+  }, {passive:false});
+
+  window.addEventListener("keyup", (e) => {
+    if(uiTyping) return;
+    keys.delete(e.key.toLowerCase());
+  });
+
+  window.addEventListener("mousemove", (e) => {
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = (e.clientX - rect.left) * (canvas.width / rect.width);
+    mouse.y = (e.clientY - rect.top) * (canvas.height / rect.height);
+  });
+
+  window.addEventListener("mousedown", (e) => {
+    if(e.button === 0){
+      mouse.down = true;
+      registerClick();
+    }
+    if(e.button === 2){
+      mouse.rdown = true;
+      looking = true;
+    }
+  });
+
+  window.addEventListener("mouseup", (e) => {
+    if(e.button === 0) mouse.down = false;
+    if(e.button === 2){
+      mouse.rdown = false;
+      looking = false;
+      lookOffset.x = 0; lookOffset.y = 0;
+    }
+  });
+
+  canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+  canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const delta = Math.sign(e.deltaY);
+    zoom = clamp(zoom + delta*0.08, 0.65, 1.45);
+  }, {passive:false});
+
+  // ===== Buttons / modals =====
+  btnControls.onclick = () => modalControls.classList.add("show");
+  btnCloseControls.onclick = () => modalControls.classList.remove("show");
+  modalControls.addEventListener("click", (e) => { if(e.target === modalControls) modalControls.classList.remove("show"); });
+
+  btnChangelog.onclick = () => modalChangelog.classList.add("show");
+  btnCloseChangelog.onclick = () => modalChangelog.classList.remove("show");
+  modalChangelog.addEventListener("click", (e) => { if(e.target === modalChangelog) modalChangelog.classList.remove("show"); });
+
+  btnFullscreen.onclick = () => {
+    if(!document.fullscreenElement){
+      document.documentElement.requestFullscreen?.();
+    }else{
+      document.exitFullscreen?.();
+    }
+  };
+
+  btnMenu.onclick = () => showMenu("Back to menu.");
+
+  btnStart.onclick = () => startGame();
+  btnPause.onclick = () => togglePause();
+  btnFinish.onclick = () => finishGame(false);
+
+  btnCode.onclick = () => {
+    const val = codeInput.value.trim();
+    if(val === "Admin123"){
+      adminUnlocked = true;
+      codeStatus.textContent = "Admin enabled";
+      adminPanel.classList.add("active");
+      logAdmin("Admin unlocked.");
+      grantAdminLoadout();
+    }else{
+      codeStatus.textContent = "Wrong code";
+      setTimeout(() => codeStatus.textContent = adminUnlocked ? "Admin enabled" : "No admin", 1200);
+    }
+    codeInput.value = "";
+  };
+
+  btnRunCmd.onclick = () => { runAdminCommand(adminCmd.value); adminCmd.value=""; };
+  btnClearLog.onclick = () => { adminLog.value=""; };
+  adminCmd.addEventListener("keydown", (e) => {
+    if(e.key === "Enter"){ e.preventDefault(); btnRunCmd.click(); }
+  });
+
+  function toggleShop(){ shopPanel.classList.toggle("active"); }
+  function togglePause(){
+    if(!running || gameOver) return;
+    paused = !paused;
+    btnPause.textContent = paused ? "Resume" : "Pause";
+    if(paused) pushFeed("Paused");
+  }
+
+  // ===== Menu selection =====
+  function selectEndless(){
+    gameMode = MODE.ENDLESS;
+    currentChapter = 1;
+    setDifficultyPreset("medium");
+    menuStatus.textContent = "Endless selected";
+    hideMenu();
+    announce("ENDLESS MODE", 1.6);
+  }
+  function selectChapter(n){
+    gameMode = MODE.CHAPTER;
+    currentChapter = n;
+    // difficulty suggestions
+    if(n === 1) setDifficultyPreset("easy");
+    else if(n === 2) setDifficultyPreset("medium");
+    else setDifficultyPreset("hard");
+    menuStatus.textContent = `Chapter ${n} selected`;
+    hideMenu();
+    announce(`CHAPTER ${n}`, 1.6);
+  }
+  btnPickEndless.onclick = () => selectEndless();
+  btnPickCh1.onclick = () => selectChapter(1);
+  btnPickCh2.onclick = () => selectChapter(2);
+  btnPickCh3.onclick = () => selectChapter(3);
+
+  function showMenu(text){
+    menuStatus.textContent = text || "Pick a mode";
+    menuOverlay.style.display = "grid";
+    // stop game but keep state safe
+    paused = true;
+    btnPause.textContent = "Resume";
+  }
+  function hideMenu(){
+    menuOverlay.style.display = "none";
+  }
+
+  // ===== Interactions (doors open; escape only in Endless) =====
+  function interact(){
+    const tx = Math.floor(player.x / TILE);
+    const ty = Math.floor(player.y / TILE);
+
+    for(let oy=-1; oy<=1; oy++){
+      for(let ox=-1; ox<=1; ox++){
+        const nx = tx+ox, ny = ty+oy;
+        if(!inBounds(nx,ny)) continue;
+
+        const i = idx(nx,ny);
+        const t = map[i];
+
+        if(t === 2){
+          map[i] = 0;
+          announce("Door opened", 1.2);
+          return;
+        }
+
+        if(t === 3){
+          if(gameMode !== MODE.ENDLESS){
+            pushFeed("Escape door is disabled in Chapters (objectives coming next).");
+            return;
+          }
+          if(!doorToolOwned){
+            pushFeed("Escape door needs Door Tool.");
+            return;
+          }
+          announce("ESCAPED! RUN COMPLETE", 2.6);
+          finishGame(true);
+          return;
+        }
+      }
+    }
+    pushFeed("Nothing to interact with.");
+  }
+
+  // ===== Shooting =====
+  function updateMouseWorld(){
+    const camX = player.x + lookOffset.x;
+    const camY = player.y + lookOffset.y;
+
+    const sx = mouse.x - canvas.width/2;
+    const sy = mouse.y - canvas.height/2;
+    mouse.worldX = camX + sx / zoom;
+    mouse.worldY = camY + sy / zoom;
+
+    if(looking){
+      const vx = mouse.worldX - player.x;
+      const vy = mouse.worldY - player.y;
+      const n = norm(vx,vy);
+      const strength = clamp(Math.hypot(vx,vy), 0, 260);
+      lookOffset.x = n.x * strength * 0.45;
+      lookOffset.y = n.y * strength * 0.45;
+    }
+  }
+
+  function tryShoot(dt){
+    if(uiTyping) return;
+    if(cheatThrottle > 0) return;
+    if(!mouse.down) return;
+
+    const w = currentWeapon();
+    if(player.durability <= 0 && !w.special) return;
+
+    shootCooldown -= dt;
+    if(shootCooldown > 0) return;
+
+    shootCooldown = w.fireRate;
+
+    if(!w.special){
+      player.durability = clamp(player.durability - w.durabilityLoss, 0, 100);
+    }
+
+    const dir = norm(mouse.worldX - player.x, mouse.worldY - player.y);
+    const pellets = w.pellets || 1;
+
+    const damageMult = 1 + player.damageBonus;
+    for(let i=0;i<pellets;i++){
+      const baseAng = Math.atan2(dir.y, dir.x);
+      const ang = baseAng + randRange(-w.spread, w.spread);
+      fireBullet(Math.cos(ang), Math.sin(ang), w.damage * damageMult, w.speed);
+    }
+  }
+
+  function fireBullet(dx,dy, damage, speed){
+    bullets.push({
+      x: player.x + dx*(player.r+6),
+      y: player.y + dy*(player.r+6),
+      vx: dx*speed,
+      vy: dy*speed,
+      r: 3,
+      damage,
+      life: 0.95
+    });
+  }
+
+  // ===== Waves / Zombies =====
+  function startNextWave(){
+    wave++;
+    spawnTick = 0;
+
+    const base = 8 + Math.floor(wave * 1.8);
+    const juggs = (wave >= 6) ? Math.floor((wave-5)/3) : 0;
+    spawnBudget = base + juggs*3;
+
+    helper.activeThisWave = helper.hired && !helper.usedThisWave;
+    helper.usedThisWave = helper.hired ? true : false;
+
+    announce("WAVE " + wave, 2.0);
+  }
+
+  function spawnZombie(juggernaut){
+    for(let tries=0; tries<280; tries++){
+      const edge = Math.floor(Math.random()*4);
+      let tx, ty;
+
+      if(edge===0){ ty = 2; tx = Math.floor(randRange(2, MAP_W-2)); }
+      if(edge===1){ tx = MAP_W-3; ty = Math.floor(randRange(2, MAP_H-2)); }
+      if(edge===2){ ty = MAP_H-3; tx = Math.floor(randRange(2, MAP_W-2)); }
+      if(edge===3){ tx = 2; ty = Math.floor(randRange(2, MAP_H-2)); }
+
+      const t = map[idx(tx,ty)];
+      if(t !== 0 && t !== 4) continue;
+
+      const x = tx*TILE + TILE/2;
+      const y = ty*TILE + TILE/2;
+
+      let r = 14;
+      let hp = (48 + wave*4) * difficulty.zombieHpMul;
+      let sp = (92 + wave*1.2) * difficulty.zombieSpMul;
+      let type = "normal";
+
+      if(juggernaut){
+        type = "juggernaut";
+        r = 22;
+        hp = (240 + wave*18) * difficulty.zombieHpMul;
+        sp = (62 + wave*0.6) * difficulty.zombieSpMul;
+      }
+
+      if(collideWorldCircle(x,y,r)) continue;
+      zombies.push({x,y,r,hp,maxHp:hp,speed:sp,type,hitCooldown:0});
+      return true;
+    }
+    return false;
+  }
+
+  function updateSpawning(dt){
+    spawnTick += dt;
+
+    if(spawnBudget > 0){
+      if(spawnTick >= 0.35){
+        spawnTick = 0;
+        const wantJugg = wave >= 6 && Math.random() < clamp((wave-5)*0.03, 0, 0.28);
+        const ok = spawnZombie(wantJugg);
+        if(ok) spawnBudget -= wantJugg ? 3 : 1;
+      }
+    }else{
+      if(zombies.length === 0){
+        startNextWave();
+      }
+    }
+  }
+
+  function nearestBuildWall(x,y, radius){
+    let best = null, bestD = radius;
+    for(const bw of buildWalls){
+      const cx = bw.x + bw.w/2, cy = bw.y + bw.h/2;
+      const d = Math.hypot(cx-x, cy-y);
+      if(d < bestD){ bestD = d; best = bw; }
+    }
+    return best;
+  }
+
+  function lineHitsRect(x1,y1,x2,y2, rx,ry,rw,rh){
+    const steps = 10;
+    for(let i=1;i<=steps;i++){
+      const t = i/steps;
+      const x = x1 + (x2-x1)*t;
+      const y = y1 + (y2-y1)*t;
+      if(x>=rx && x<=rx+rw && y>=ry && y<=ry+rh) return true;
+    }
+    return false;
+  }
+
+  function updateZombies(dt){
+    for(const z of zombies){
+      z.hitCooldown = Math.max(0, z.hitCooldown - dt);
+      if(freezeZombies) continue;
+
+      let tx = player.x, ty = player.y;
+      if(helper.activeThisWave && Math.random() < 0.10){
+        tx = helper.x; ty = helper.y;
+      }
+
+      // build wall blocking?
+      const wall = nearestBuildWall(z.x,z.y, 55);
+      if(wall && lineHitsRect(z.x,z.y, tx,ty, wall.x,wall.y,wall.w,wall.h)){
+        const wx = (wall.x+wall.w/2) - z.x;
+        const wy = (wall.y+wall.h/2) - z.y;
+        const nd = Math.hypot(wx,wy) || 1;
+        const mx = (wx/nd) * z.speed * dt;
+        const my = (wy/nd) * z.speed * dt;
+
+        if(circleRectOverlap(z.x,z.y,z.r, wall.x,wall.y,wall.w,wall.h)){
+          const dmg = (z.type==="juggernaut") ? 42 : 18;
+          wall.hp -= dmg * dt;
+          if(wall.hp <= 0){
+            const i = buildWalls.indexOf(wall);
+            if(i>=0) buildWalls.splice(i,1);
+            pushFeed("A wall got destroyed!");
+          }
+        }else{
+          moveWithCollision(z, mx, my);
+        }
+        continue;
+      }
+
+      // chase
+      const vx = tx - z.x, vy = ty - z.y;
+      const d = Math.hypot(vx,vy) || 1;
+
+      // grass slows zombies a bit (chapter 2 feel)
+      const tile = tileAtWorld(z.x, z.y);
+      const grassSlow = isGrassTile(tile) ? 0.88 : 1.0;
+
+      moveWithCollision(z, (vx/d)*z.speed*grassSlow*dt, (vy/d)*z.speed*grassSlow*dt);
+
+      // hit player
+      const pd = Math.hypot(player.x - z.x, player.y - z.y);
+      if(pd < player.r + z.r + 2){
+        if(z.hitCooldown <= 0){
+          z.hitCooldown = 0.6;
+          if(!player.god){
+            const dmg = (z.type==="juggernaut") ? 18 : 9;
+            player.hp = Math.max(0, player.hp - dmg);
+            if(player.hp <= 0) endGameOver();
+          }
+        }
+      }
+    }
+  }
+
+  // ===== Bullets =====
+  function updateBullets(dt){
+    for(let i=bullets.length-1;i>=0;i--){
+      const b = bullets[i];
+      b.life -= dt;
+      if(b.life <= 0){ bullets.splice(i,1); continue; }
+
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+
+      const t = tileAtWorld(b.x,b.y);
+      if(isSolidTile(t) || isDoorTile(t)){ bullets.splice(i,1); continue; }
+
+      // build walls
+      for(const bw of buildWalls){
+        if(circleRectOverlap(b.x,b.y,b.r, bw.x,bw.y,bw.w,bw.h)){
+          bw.hp -= b.damage * 0.8;
+          if(bw.hp <= 0){
+            const j = buildWalls.indexOf(bw);
+            if(j>=0) buildWalls.splice(j,1);
+          }
+          bullets.splice(i,1);
+          break;
+        }
+      }
+      if(i >= bullets.length) continue;
+
+      // zombies
+      for(let z=zombies.length-1; z>=0; z--){
+        const zz = zombies[z];
+        if(Math.hypot(zz.x-b.x, zz.y-b.y) < zz.r + b.r){
+          zz.hp -= b.damage;
+          bullets.splice(i,1);
+
+          if(zz.hp <= 0){
+            zombies.splice(z,1);
+
+            const rewardBase = (zz.type==="juggernaut") ? 35 : 12;
+            const reward = Math.floor(rewardBase * difficulty.moneyMul);
+            if(!player.infiniteMoney) player.money += reward;
+            player.score += reward;
+
+            const xpGain = (zz.type==="juggernaut") ? 40 : 15;
+            gainXP(xpGain);
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  // ===== XP / Leveling =====
+  function gainXP(amount){
+    player.xp += amount;
+    while(player.xp >= player.xpNext){
+      player.xp -= player.xpNext;
+      player.level++;
+      player.xpNext = Math.floor(player.xpNext * 1.35);
+
+      player.maxHp += 5;
+      player.hp = player.maxHp;
+
+      player.damageBonus = clamp(player.damageBonus + 0.03, 0, 0.6);
+      announce("LEVEL UP! (" + player.level + ")", 2.2);
+    }
+  }
+
+  // ===== Helper =====
+  function updateHelper(dt){
+    if(!helper.activeThisWave) return;
+
+    const vx = (player.x - helper.x);
+    const vy = (player.y - helper.y);
+    const d = Math.hypot(vx,vy) || 1;
+    const followDist = 120;
+
+    if(d > followDist){
+      helper.x += (vx/d) * 190 * dt;
+      helper.y += (vy/d) * 190 * dt;
+    }
+
+    helper.fireCooldown -= dt;
+    if(helper.fireCooldown <= 0){
+      let best=null, bestD=520;
+      for(const z of zombies){
+        const dd = Math.hypot(z.x-helper.x, z.y-helper.y);
+        if(dd < bestD){ bestD = dd; best = z; }
+      }
+      if(best){
+        helper.fireCooldown = 0.18;
+        const dir = norm(best.x-helper.x, best.y-helper.y);
+        bullets.push({x: helper.x, y: helper.y, vx: dir.x*760, vy: dir.y*760, r: 3, damage: helper.damage, life: 0.7});
+      }
+    }
+  }
+
+  // ===== UI / Game flow =====
+  function startGame(){
+    // build correct map for mode/chapter
+    buildMapForSelection();
+
+    buildWalls.length = 0;
+    bullets.length = 0;
+    zombies.length = 0;
+
+    running = true;
+    paused = false;
+    gameOver = false;
+
+    const sp = findSafeSpawn();
+    player.x = sp.x; player.y = sp.y;
+
+    // reset player
+    player.hp = 100; player.maxHp = 100;
+    player.score = 0;
+    player.gunId = "pistol";
+    player.durability = 100;
+
+    player.level = 1;
+    player.xp = 0;
+    player.xpNext = 100;
+    player.damageBonus = 0;
+
+    // money start changes slightly by mode
+    player.infiniteMoney = false;
+    player.money = (gameMode === MODE.ENDLESS) ? 100 : 140;
+    player.god = false;
+
+    doorToolOwned = false;
+
+    helper.hired = false;
+    helper.activeThisWave = false;
+    helper.usedThisWave = false;
+    helper.x = player.x + 60;
+    helper.y = player.y + 60;
+
+    // anti-cheat reset
+    clickTimes = [];
+    clickIntervals = [];
+    cheatThrottle = 0;
+
+    wave = 0;
+    spawnBudget = 0;
+    startNextWave();
+
+    btnStart.disabled = true;
+    btnPause.disabled = false;
+    btnFinish.disabled = false;
+    btnPause.textContent = "Pause";
+
+    canvas.focus();
+
+    statMode.textContent = "Mode: " + modeLabel();
+    pushFeed("Started. Survive the horde!");
+  }
+
+  function finishGame(escaped){
+    running = false;
+    paused = false;
+    gameOver = false;
+    btnStart.disabled = false;
+    btnPause.disabled = true;
+    btnFinish.disabled = true;
+    pushFeed(escaped ? ("Escaped! Score: " + player.score) : ("Finished. Score: " + player.score));
+  }
+
+  function endGameOver(){
+    gameOver = true;
+    paused = true;
+    btnPause.textContent = "Resume";
+    announce("GAME OVER", 2.6);
+  }
+
+  function updateUI(){
+    statMode.textContent = "Mode: " + modeLabel();
+    statWave.textContent = "Wave: " + wave;
+    statHP.textContent = "HP: " + player.hp + (player.god ? " (GOD)" : "");
+    statMoney.textContent = "Money: " + (player.infiniteMoney ? "∞" : player.money);
+    statZ.textContent = "Zombies: " + zombies.length;
+    statGun.textContent = "Gun: " + currentWeapon().name;
+    statDur.textContent = "Dur: " + Math.round(player.durability) + "%";
+    statXP.textContent = `Lvl ${player.level} | XP ${player.xp}/${player.xpNext}`;
+  }
+
+  // ===== Drawing =====
+  function drawTiles(){
+    const camX = player.x + lookOffset.x;
+    const camY = player.y + lookOffset.y;
+    const viewW = canvas.width/zoom;
+    const viewH = canvas.height/zoom;
+
+    const minTx = clamp(Math.floor((camX - viewW/2)/TILE)-2, 0, MAP_W-1);
+    const maxTx = clamp(Math.floor((camX + viewW/2)/TILE)+2, 0, MAP_W-1);
+    const minTy = clamp(Math.floor((camY - viewH/2)/TILE)-2, 0, MAP_H-1);
+    const maxTy = clamp(Math.floor((camY + viewH/2)/TILE)+2, 0, MAP_H-1);
+
+    for(let ty=minTy; ty<=maxTy; ty++){
+      for(let tx=minTx; tx<=maxTx; tx++){
+        const t = map[idx(tx,ty)];
+        const x = tx*TILE, y = ty*TILE;
+
+        // base floor/grass
+        if(t === 4){
+          ctx.fillStyle = ((tx+ty)%2===0) ? "rgba(90,180,90,0.14)" : "rgba(90,180,90,0.10)";
+          ctx.fillRect(x,y,TILE,TILE);
+        } else {
+          ctx.fillStyle = ((tx+ty)%2===0) ? "rgba(255,255,255,0.035)" : "rgba(255,255,255,0.025)";
+          ctx.fillRect(x,y,TILE,TILE);
+        }
+
+        if(t === 1){
+          ctx.fillStyle = "#162235";
+          ctx.fillRect(x,y,TILE,TILE);
+        }else if(t === 2){
+          ctx.fillStyle = "#2a3a52";
+          ctx.fillRect(x,y,TILE,TILE);
+          ctx.fillStyle = "rgba(203,216,255,0.9)";
+          ctx.fillRect(x+TILE*0.28, y+TILE*0.18, TILE*0.44, TILE*0.64);
+        }else if(t === 3){
+          ctx.fillStyle = "#3b2a52";
+          ctx.fillRect(x,y,TILE,TILE);
+          ctx.fillStyle = "rgba(255,209,255,0.95)";
+          ctx.fillRect(x+TILE*0.28, y+TILE*0.18, TILE*0.44, TILE*0.64);
+        }
+      }
+    }
+  }
+
+  function drawOverlay(){
+    if(bannerT > 0){
+      ctx.save();
+      ctx.fillStyle = "rgba(0,0,0,0.45)";
+      ctx.fillRect(0, canvas.height*0.08, canvas.width, 70);
+      ctx.fillStyle = "#e8eef7";
+      ctx.font = "800 42px system-ui";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(bannerText, canvas.width/2, canvas.height*0.08 + 35);
+      ctx.restore();
+    }
+
+    ctx.save();
+    ctx.font = "600 14px system-ui";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    let y = canvas.height - 18 - 18*feed.length;
+    for(const m of feed){
+      ctx.fillStyle = "rgba(0,0,0,0.35)";
+      ctx.fillRect(12, y-2, 620, 18);
+      ctx.fillStyle = "rgba(232,238,247,0.92)";
+      ctx.fillText(m.text, 18, y);
+      y += 18;
+    }
+    ctx.restore();
+
+    // crosshair
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,255,255,0.55)";
+    ctx.lineWidth = 2;
+    const cx = mouse.x, cy = mouse.y;
+    ctx.beginPath();
+    ctx.moveTo(cx-10, cy); ctx.lineTo(cx-3, cy);
+    ctx.moveTo(cx+3, cy);  ctx.lineTo(cx+10, cy);
+    ctx.moveTo(cx, cy-10); ctx.lineTo(cx, cy-3);
+    ctx.moveTo(cx, cy+3);  ctx.lineTo(cx, cy+10);
+    ctx.stroke();
+    ctx.restore();
+
+    if(!running){
+      drawCenterText("Pick a mode in Menu, then press Start");
+    }else if(paused && !gameOver){
+      drawCenterText("Paused");
+    }else if(gameOver){
+      drawCenterText("Game Over");
+    }
+  }
+
+  function drawCenterText(text){
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    ctx.fillRect(0, canvas.height/2 - 50, canvas.width, 100);
+    ctx.fillStyle = "#e8eef7";
+    ctx.font = "900 28px system-ui";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, canvas.width/2, canvas.height/2);
+    ctx.restore();
+  }
+
+  function draw(){
+    ctx.fillStyle = "#070a10";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    const camX = player.x + lookOffset.x;
+    const camY = player.y + lookOffset.y;
+
+    ctx.save();
+    ctx.translate(canvas.width/2, canvas.height/2);
+    ctx.scale(zoom, zoom);
+    ctx.translate(-camX, -camY);
+
+    drawTiles();
+
+    // build walls
+    for(const bw of buildWalls){
+      ctx.fillStyle = "#1c2a3f";
+      ctx.fillRect(bw.x,bw.y,bw.w,bw.h);
+      const p = clamp(bw.hp/bw.maxHp, 0, 1);
+      ctx.fillStyle = "rgba(255,255,255,0.18)";
+      ctx.fillRect(bw.x, bw.y-6, bw.w, 4);
+      ctx.fillStyle = "rgba(80,220,120,0.75)";
+      ctx.fillRect(bw.x, bw.y-6, bw.w*p, 4);
+    }
+
+    // bullets
+    ctx.fillStyle = "#e8eef7";
+    for(const b of bullets){
+      ctx.beginPath();
+      ctx.arc(b.x,b.y,b.r,0,Math.PI*2);
+      ctx.fill();
+    }
+
+    // zombies
+    for(const z of zombies){
+      ctx.fillStyle = (z.type==="juggernaut") ? "#c44" : "#6bd36b";
+      ctx.beginPath();
+      ctx.arc(z.x,z.y,z.r,0,Math.PI*2);
+      ctx.fill();
+
+      const p = clamp(z.hp/z.maxHp, 0, 1);
+      ctx.fillStyle = "rgba(0,0,0,0.45)";
+      ctx.fillRect(z.x - z.r, z.y - z.r - 10, z.r*2, 5);
+      ctx.fillStyle = "rgba(255,255,255,0.75)";
+      ctx.fillRect(z.x - z.r, z.y - z.r - 10, z.r*2*p, 5);
+    }
+
+    // helper
+    if(helper.activeThisWave){
+      ctx.fillStyle = "#6bb7ff";
+      ctx.beginPath();
+      ctx.arc(helper.x,helper.y,12,0,Math.PI*2);
+      ctx.fill();
+    }
+
+    // player
+    ctx.fillStyle = "#ffd86b";
+    ctx.beginPath();
+    ctx.arc(player.x,player.y,player.r,0,Math.PI*2);
+    ctx.fill();
+
+    // aim line
+    ctx.strokeStyle = "rgba(255,255,255,0.20)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(player.x, player.y);
+    ctx.lineTo(mouse.worldX, mouse.worldY);
+    ctx.stroke();
+
+    ctx.restore();
+
+    drawOverlay();
+  }
+
+  // ===== Loop =====
+  let last = performance.now();
+  function frame(now){
+    const dt = Math.min(0.033, (now-last)/1000);
+    last = now;
+
+    updateMouseWorld();
+
+    if(bannerT > 0) bannerT -= dt;
+    for(let i=feed.length-1;i>=0;i--){
+      feed[i].t -= dt;
+      if(feed[i].t <= 0) feed.splice(i,1);
+    }
+    if(cheatThrottle > 0) cheatThrottle = Math.max(0, cheatThrottle - dt);
+
+    if(running && !paused && !gameOver){
+      // movement
+      if(!uiTyping){
+        const up = keys.has("w"), down = keys.has("s"), left = keys.has("a"), right = keys.has("d");
+        let mx = (right?1:0) - (left?1:0);
+        let my = (down?1:0) - (up?1:0);
+        if(mx || my){
+          const n = norm(mx,my);
+          // walking on grass slows player slightly too (outdoor feel)
+          const tile = tileAtWorld(player.x, player.y);
+          const grassSlow = isGrassTile(tile) ? 0.95 : 1.0;
+          moveWithCollision(player, n.x*player.speed*grassSlow*dt, n.y*player.speed*grassSlow*dt);
+        }
+      }
+
+      tryShoot(dt);
+      updateSpawning(dt);
+      updateZombies(dt);
+      updateHelper(dt);
+      updateBullets(dt);
+    }
+
+    updateUI();
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  // ===== Init =====
+  function init(){
+    buildShopUI();
+    announce("READY", 1.1);
+    statMode.textContent = "Mode: —";
+    btnStart.disabled = false;
+    btnPause.disabled = true;
+    btnFinish.disabled = true;
+    showMenu("Pick a mode");
+    requestAnimationFrame(frame);
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
